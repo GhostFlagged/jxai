@@ -123,10 +123,75 @@ def test_run_dirs_are_unique_per_run(tmp_db):
 def test_findings_json_merges_model_and_static(tmp_db, tmp_path):
     from jxai.pipeline import _write_findings
     ctx = {
-        "ai_findings": [{"severity": "High", "title": "DOM XSS", "reasoning": "untrusted sink"}],
+        "ai_findings": [{"severity": "High", "verdict": "confirmed", "title": "DOM XSS",
+                         "reasoning": "untrusted sink"}],
         "deep_audit": {"flows": [{"source": "location.search", "sink": "innerHTML"}]},
     }
     _write_findings(ctx, tmp_path)
     rows = json.loads((tmp_path / "findings.json").read_text())
     assert {r["source"] for r in rows} == {"model", "static"}
-    assert any(r["severity"] == "High" for r in rows)
+
+
+def test_findings_match_what_the_report_renders(tmp_db, tmp_path):
+    """The UI and report.md must not disagree. report.md lists only findings the
+    model marked confirmed/likely, so the export has to apply the same filter."""
+    from jxai.pipeline import _write_findings
+    ctx = {
+        "ai_findings": [
+            {"severity": "High", "verdict": "confirmed", "url": "https://x/api/a", "confidence": 0.9},
+            {"severity": "Low", "verdict": "rejected", "url": "https://x/api/b", "confidence": 0.2},
+            {"verdict": "likely", "url": "https://x/api/c"},
+        ],
+        "deep_audit": {"flows": [
+            {"source": "a.js:1 (q)", "sink": "a.js:2 (eval)", "severity": "Medium",
+             "confidence": "confirmed", "reasoning": "r", "exploit": "e"},
+        ]},
+    }
+    _write_findings(ctx, tmp_path)
+    rows = json.loads((tmp_path / "findings.json").read_text())
+    model_urls = {r["url"] for r in rows if r["source"] == "model"}
+    assert model_urls == {"https://x/api/a", "https://x/api/c"}  # the rejected one is dropped
+    assert rows[0]["severity"] == "High"  # severity-sorted, most severe first
+
+
+def test_findings_carry_flow_severity_and_confidence(tmp_db, tmp_path):
+    """Regression: flows were exported as "Unrated" with no confidence, which made
+    the UI show materially less than the report."""
+    from jxai.pipeline import _write_findings
+    ctx = {"deep_audit": {"flows": [
+        {"source": "a.js:1 (q)", "sink": "a.js:2 (eval)",
+         "severity": "High", "confidence": "confirmed", "exploit": "curl ..."},
+    ]}}
+    _write_findings(ctx, tmp_path)
+    (f,) = json.loads((tmp_path / "findings.json").read_text())
+    assert f["severity"] == "High"
+    assert f["confidence"] == "confirmed"
+    assert "q" in f["title"] and "eval" in f["title"]   # identity, not a generic label
+    assert "Exploit:" in f["detail"]                     # exploit sketch is evidence too
+
+
+def test_probe_counts_exclude_spa_shell(tmp_db):
+    """A 200 that is just the SPA index page is not an interesting finding."""
+    from fastapi.testclient import TestClient
+
+    from jxai.runner import run_dir_for
+    from jxai.web import app
+
+    t = store.add_target("a", "https://a.com")
+    run = store.start_run(t["id"], "", "cli")
+    run_dir = run_dir_for(t, run["id"])
+    run_dir.mkdir(parents=True, exist_ok=True)
+    store.update_run_dir(run["id"], str(run_dir))
+
+    (run_dir / "results.json").write_text(json.dumps([
+        {"url": "https://a.com/api", "method": "GET", "probes": [
+            {"probe": "no-auth", "status": 200, "auth_wall": False, "spa_shell": False},
+            {"probe": "no-auth", "status": 200, "auth_wall": False, "spa_shell": True},
+            {"probe": "no-auth", "status": 401, "auth_wall": True, "spa_shell": False},
+        ]},
+    ]))
+    with TestClient(app) as c:
+        resp = c.get(f"/runs/{run['id']}/probes")
+        assert resp.status_code == 200, resp.text
+        page = resp.text
+    assert "1</strong> reached 200 with no auth wall" in page

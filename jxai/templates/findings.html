@@ -2,7 +2,8 @@
 {% block title %}Findings — run #{{ run.id }}{% endblock %}
 {% block content %}
 <h1>Findings — run #{{ run.id }}</h1>
-<p class="sub">{{ target.name if target else "" }} · model-triaged findings and static taint flows.</p>
+<p class="sub">{{ target.name if target else "" }} · {{ findings | length }} {{ "finding" if findings | length == 1 else "findings" }},
+sorted by severity. This is the same evidence the generated report is built from.</p>
 
 <div class="tabs">
   <a href="/runs/{{ run.id }}">Overview</a>
@@ -10,24 +11,56 @@
   <a href="/runs/{{ run.id }}/paths">Paths</a>
   <a href="/runs/{{ run.id }}/probes">Probes</a>
   <a href="/runs/{{ run.id }}/js">Downloaded JS</a>
+  <a href="/runs/{{ run.id }}/artifact/report.md" target="_blank">Markdown report</a>
 </div>
 
 {% if findings %}
-<table>
-  <thead><tr><th>Severity</th><th>Source</th><th>Finding</th><th>Detail</th><th>Location</th></tr></thead>
-  <tbody>
-  {% for f in findings %}
-    <tr>
-      <td><span class="pill {{ f.severity }}">{{ f.severity }}</span></td>
-      <td class="muted">{{ f.source }}</td>
-      <td>{{ f.title }}</td>
-      <td class="muted">{{ (f.detail or '') | truncate(220) }}</td>
-      <td class="mono hint">{{ (f.url or '') | truncate(40) }}</td>
-    </tr>
+  {% for sev, label in [("Critical","Critical"), ("High","High"), ("Medium","Medium"), ("Low","Low")] %}
+  {% set group = findings | selectattr("severity", "equalto", sev) | list %}
+  {% if group %}
+  <h2>{{ label }} <span class="muted">({{ group | length }})</span></h2>
+  <table>
+    <thead><tr><th>Severity</th><th>Type</th><th>Finding</th><th>Confidence</th><th>Evidence</th></tr></thead>
+    <tbody>
+    {% for f in group %}
+      <tr>
+        <td><span class="pill {{ sev | lower }}">{{ sev }}</span></td>
+        <td class="muted">{{ f.source }}{% if f.verdict %} · {{ f.verdict }}{% endif %}</td>
+        <td>{{ f.title }}{% if f.url %}<div class="mono hint">{{ f.url | truncate(70) }}</div>{% endif %}</td>
+        <td class="muted">{{ f.confidence or '—' }}</td>
+        <td>
+          {% if f.detail %}{{ f.detail | truncate(400) }}{% endif %}
+          {% if f.remediation %}<div class="hint"><strong>Fix:</strong> {{ f.remediation }}</div>{% endif %}
+          {% if f.next_step %}<div class="hint"><strong>Next step:</strong> {{ f.next_step }}</div>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
   {% endfor %}
-  </tbody>
-</table>
+
+  {% set others = findings | rejectattr("severity", "in", ["Critical","High","Medium","Low"]) | list %}
+  {% if others %}
+  <h2>Other <span class="muted">({{ others | length }})</span></h2>
+  <table>
+    <thead><tr><th>Severity</th><th>Type</th><th>Finding</th><th>Evidence</th></tr></thead>
+    <tbody>
+    {% for f in others %}
+      <tr>
+        <td><span class="pill">{{ f.severity }}</span></td>
+        <td class="muted">{{ f.source }}</td>
+        <td>{{ f.title }}</td>
+        <td>{{ (f.detail or '') | truncate(400) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 {% else %}
-<div class="panel empty">This run produced no findings, or has not finished yet.</div>
+<div class="panel empty">
+  No findings recorded for this run yet.
+  <div class="hint">If the run has finished, either nothing was flagged, or the AI stages were skipped.</div>
+</div>
 {% endif %}
 {% endblock %}

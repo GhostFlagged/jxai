@@ -14,11 +14,10 @@ interesting when no probe hit an auth wall.</p>
 </div>
 
 {% if results %}
-{% set open = results | selectattr('probes') | map('attr', 'probes') | flatten
-        | selectattr('status', 'equalto', 200) | list %}
 <div class="panel">
   <strong>{{ results | length }}</strong> endpoints probed ·
-  <strong>{{ open | length }}</strong> returned 200 unauthenticated.
+  <strong>{{ probe_count }}</strong> probes sent ·
+  <strong>{{ open_count }}</strong> reached 200 with no auth wall.
 </div>
 <table>
   <thead><tr><th>URL</th><th>Method</th><th>Probe</th><th>Status</th><th>Length</th><th>Auth wall</th><th>SPA shell</th></tr></thead>

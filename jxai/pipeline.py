@@ -88,43 +88,79 @@ def run_pipeline(
 
 
 def _write_findings(ctx: Mapping[str, Any], out_dir: pathlib.Path) -> None:
-    """Flatten findings and static flows into one list the UI can rank and filter.
+    """Flatten model findings and static flows into one ranked list for the UI.
 
-    The report renders these separately (model findings carry a severity, static
-    flows do not); the UI needs them unified to sort by triage value.
+    Model findings already carry a severity and a verdict, so only verified ones
+    (confirmed/likely) are surfaced — matching what report.md does. Static flows
+    carry their own severity/confidence and are always listed, since nothing else
+    in the UI would show them. A finding the UI hides but the report prints (or
+    vice versa) is a discrepancy worth avoiding.
     """
     import json
 
     deep = ctx.get("deep_audit") or {}
     rows: list[dict[str, Any]] = []
+
     for f in ctx.get("ai_findings") or []:
         if not isinstance(f, dict):
+            continue
+        if str(f.get("verdict", "")).lower() not in ("confirmed", "likely"):
             continue
         rows.append({
             "source": "model",
             "severity": f.get("severity") or "Informational",
-            "title": f.get("title") or f.get("issue") or "",
-            "detail": f.get("reasoning") or f.get("detail") or "",
-            "url": f.get("url") or f.get("location") or "",
-            "remediation": f.get("remediation") or "",
             "confidence": f.get("confidence") or "",
+            "verdict": f.get("verdict") or "",
+            "title": f.get("title") or f.get("url") or "unauthenticated access",
+            "detail": f.get("reasoning") or "",
+            "url": f.get("url") or "",
+            "remediation": f.get("remediation") or "",
+            "next_step": f.get("next_step") or "",
         })
+
     for flow in deep.get("flows") or []:
         if not isinstance(flow, dict):
             continue
+        source, sink = _loc(flow.get("source")), _loc(flow.get("sink"))
         rows.append({
             "source": "static",
-            "severity": "Unrated",
-            "title": f"{flow.get('source', 'source')} → {flow.get('sink', 'sink')}",
-            "detail": flow.get("exploit") or flow.get("detail") or flow.get("note") or "",
-            "url": str(flow.get("location") or flow.get("file") or ""),
+            "severity": flow.get("severity") or "Unrated",
+            "confidence": flow.get("confidence") or "",
+            "verdict": "",
+            # Flows carry no name field, so the source->sink pair is the finding's
+            # identity. Truncated to the line reference; full text is in the detail.
+            "title": f"{source} → {sink}",
+            "detail": "\n\n".join(x for x in (
+                flow.get("reasoning") or "",
+                f"Exploit: {flow.get('exploit') or flow.get('exploit_sketch')}"
+                if (flow.get("exploit") or flow.get("exploit_sketch")) else "",
+            ) if x),
+            "url": f"{source} -> {sink}",
             "remediation": flow.get("remediation") or "",
-            "confidence": "",
+            "next_step": "",
         })
+
+    rows.sort(key=lambda r: (_SEV_RANK.get(str(r["severity"]).lower(), 9),
+                             str(r["source"])))
     try:
         (out_dir / "findings.json").write_text(json.dumps(rows, indent=2), encoding="utf-8")
     except OSError as exc:
         log.warning("could not write findings.json: %s", exc)
+
+
+_SEV_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4, "unrated": 5}
+
+
+def _loc(v: Any) -> str:
+    """Render a source/sink that may be a string or a {file,line} dict."""
+    if isinstance(v, dict):
+        f = v.get("file", "")
+        short = f.rsplit("/", 1)[-1] if f else ""
+        ln = v.get("line", "")
+        if short or ln:
+            return f"{short}:{ln}" if ln != "" else short
+        return v.get("input") or v.get("detail") or str(v)
+    return str(v) if v is not None else "?"
 
 
 def summarize(ctx: Mapping[str, Any]) -> dict[str, Any]:

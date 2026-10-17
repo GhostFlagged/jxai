@@ -251,8 +251,16 @@ def run_probes(request: Request, run_id: int):
     if not run:
         raise HTTPException(404, "run not found")
     results = _read_json(_run_dir(run) / "results.json", [])
+    # Counted here rather than in the template: Jinja has no flatten filter, and a
+    # probe that reached 200 with no auth wall and did not return the SPA shell is
+    # the only genuinely interesting outcome.
+    probes = [p for r in results for p in (r.get("probes") or [])]
+    open_probes = [p for p in probes
+                   if p.get("status") == 200 and not p.get("auth_wall") and not p.get("spa_shell")]
     return templates.TemplateResponse(
-        request, "probes.html", _ctx(request, run=run, target=store.get_target(run["target_id"]), results=results)
+        request, "probes.html",
+        _ctx(request, run=run, target=store.get_target(run["target_id"]),
+             results=results, probe_count=len(probes), open_count=len(open_probes))
     )
 
 
