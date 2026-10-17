@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Paths — run #{{ run.id }}{% endblock %}
+{% block content %}
+<h1>Discovered paths — run #{{ run.id }}</h1>
+<p class="sub">{{ discovered | length }} {{ "endpoint" if discovered | length == 1 else "endpoints" }} harvested from the downloaded bundles.</p>
+
+<div class="tabs">
+  <a href="/runs/{{ run.id }}">Overview</a>
+  <a href="/runs/{{ run.id }}/findings">Findings</a>
+  <a href="/runs/{{ run.id }}/paths" class="active">Paths</a>
+  <a href="/runs/{{ run.id }}/probes">Probes</a>
+  <a href="/runs/{{ run.id }}/js">Downloaded JS</a>
+</div>
+
+{% if discovered %}
+<table>
+  <thead><tr><th>Path</th><th>Methods</th><th>Kinds</th><th>URL</th></tr></thead>
+  <tbody>
+  {% for p in discovered %}
+    <tr>
+      <td class="mono">{{ p.path | truncate(70) }}</td>
+      <td>{{ (p.methods or []) | join(', ') }}</td>
+      <td class="muted">{{ (p.kinds or []) | join(', ') | truncate(50) }}</td>
+      <td class="mono hint">{{ (p.url or '') | truncate(50) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="panel empty">No paths recorded for this run yet.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Downloaded JS — run #{{ run.id }}{% endblock %}
+{% block content %}
+<h1>Downloaded JS — run #{{ run.id }}</h1>
+<p class="sub">Beautified bundles pulled from {{ target.url if target else "the target" }}.</p>
+
+<div class="tabs">
+  <a href="/runs/{{ run.id }}">Overview</a>
+  <a href="/runs/{{ run.id }}/findings">Findings</a>
+  <a href="/runs/{{ run.id }}/paths">Paths</a>
+  <a href="/runs/{{ run.id }}/probes">Probes</a>
+  <a href="/runs/{{ run.id }}/js" class="active">Downloaded JS</a>
+</div>
+
+<div class="panel row">
+  <select id="file" class="grow" onchange="loadFile(0)"><option value="">Loading…</option></select>
+  <button class="btn" onclick="loadFile(Math.max(0, offset - window.LIMIT))">Prev</button>
+  <span class="muted mono" id="range"></span>
+  <button class="btn" onclick="loadFile(offset + window.LIMIT)">Next</button>
+</div>
+<div class="code" id="code">Select a file.</div>
+
+<script>
+  const RUN = {{ run.id }};
+  window.LIMIT = 2000;
+  let offset = 0;
+  let total = 0;
+  const sel = document.getElementById('file');
+
+  fetch(`/runs/${RUN}/js`)
+    .then(r => r.json())
+    .then(files => {
+      if (!files.length) { document.getElementById('code').textContent = 'No JS files in this run.'; sel.innerHTML = '<option value="">—</option>'; return; }
+      sel.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('');
+      loadFile(0);
+    })
+    .catch(() => { document.getElementById('code').textContent = 'Failed to load file list.'; });
+
+  function loadFile(off) {
+    const name = sel.value;
+    if (!name) return;
+    offset = Math.max(0, off);
+    fetch(`/runs/${RUN}/js/view?name=${encodeURIComponent(name)}&offset=${offset}&limit=${window.LIMIT}`)
+      .then(r => r.text().then(t => ({ ok: r.ok, body: t, total: r.headers.get('X-Total-Lines') })))
+      .then(d => {
+        if (!d.ok) { document.getElementById('code').textContent = d.body; return; }
+        total = Number(d.total) || 0;
+        document.getElementById('code').textContent = d.body || '(end of file)';
+        const from = Math.min(offset + 1, total), to = Math.min(offset + window.LIMIT, total);
+        document.getElementById('range').textContent = total ? `lines ${from}–${to} of ${total}` : 'empty';
+      });
+  }
+</script>
+{% endblock %}

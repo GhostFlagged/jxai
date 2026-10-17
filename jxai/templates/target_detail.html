@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ target.name }}{% endblock %}
+{% block content %}
+<h1>{{ target.name }}</h1>
+<p class="sub mono">{{ target.url }}</p>
+
+<div class="panel">
+  <div class="row">
+    <div>
+      <strong>Scope:</strong>
+      <span class="muted mono">{{ target.scope | join(', ') or '—' }}</span>
+    </div>
+    {% if not target.enabled %}<span class="pill">disabled</span>{% endif %}
+  </div>
+  {% if target.notes %}<div class="hint">{{ target.notes }}</div>{% endif %}
+  {% if target.overrides %}<div class="hint">Stage overrides are set for this target.</div>{% endif %}
+  <div class="actions">
+    {% if target.enabled and has_key() %}
+    <form class="inline" method="post" action="/targets/{{ target.id }}/run">
+      <button class="btn primary" type="submit">Run scan</button>
+    </form>
+    {% elif not has_key() %}
+    <button class="btn" disabled title="SINOX_API_KEY is not set">Run scan</button>
+    {% endif %}
+    <a class="btn" href="/targets/{{ target.id }}/edit">Edit</a>
+  </div>
+</div>
+
+{% if latest %}
+<h2>Latest run</h2>
+<div class="panel">
+  <div class="row">
+    <span class="pill {{ latest.status }}">{{ latest.status }}</span>
+    <span class="muted">run #{{ latest.id }} · {{ latest.started_at | ts }}</span>
+    <a class="btn" href="/runs/{{ latest.id }}">Open run</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n">{{ latest.stats.get('js_files', 0) }}</div><div class="l">JS files</div></div>
+    <div class="stat"><div class="n">{{ latest.stats.get('paths', 0) }}</div><div class="l">Paths</div></div>
+    <div class="stat"><div class="n">{{ latest.stats.get('probes', 0) }}</div><div class="l">Probes</div></div>
+    <div class="stat"><div class="n">{{ latest.stats.get('flows', 0) }}</div><div class="l">Flows</div></div>
+    <div class="stat"><div class="n">{{ latest.stats.get('findings', 0) }}</div><div class="l">Findings</div></div>
+    <div class="stat"><div class="n">{{ latest.stats.get('critical', 0) }}</div><div class="l">Critical</div></div>
+  </div>
+</div>
+{% endif %}
+
+<h2>Run history</h2>
+{% if runs %}
+<table>
+  <thead><tr><th>#</th><th>Status</th><th>Started</th><th>Finished</th><th>Findings</th><th></th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td class="mono">{{ r.id }}</td>
+      <td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
+      <td class="muted">{{ r.started_at | ts }}</td>
+      <td class="muted">{{ r.finished_at | ts }}</td>
+      <td class="num">{{ r.stats.get('findings', '—') }}</td>
+      <td><a href="/runs/{{ r.id }}">open</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="panel empty">No runs yet.</div>
+{% endif %}
+{% endblock %}

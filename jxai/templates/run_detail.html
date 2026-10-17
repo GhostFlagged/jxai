@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Run #{{ run.id }}{% endblock %}
+{% block content %}
+<h1>Run #{{ run.id }} — {{ target.name if target else "(deleted)" }}</h1>
+<p class="sub">
+  <span class="pill {{ run.status }}" id="status">{{ run.status }}</span>
+  started {{ run.started_at | ts }}
+  {% if run.finished_at %} · finished {{ run.finished_at | ts }}{% endif %}
+  {% if run.trigger %} · via {{ run.trigger }}{% endif %}
+</p>
+
+{% if run.error %}<div class="error">{{ run.error }}</div>{% endif %}
+
+<div class="panel">
+  <h2 style="margin-top:0">Stages</h2>
+  <ul class="stages" id="stages">
+    {% for s in run.stages %}
+    <li><span class="pill {{ s.status }}">{{ s.status }}</span><span class="stage-name">{{ s.stage }}</span>
+      {% if s.detail and s.detail.error %}<span class="stage-detail">{{ s.detail.error }}</span>{% endif %}</li>
+    {% else %}
+    <li class="muted">No stages recorded yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% if run.stats %}
+<div class="panel">
+  <div class="stats">
+    <div class="stat"><div class="n">{{ run.stats.get('js_files', 0) }}</div><div class="l">JS files</div></div>
+    <div class="stat"><div class="n">{{ run.stats.get('paths', 0) }}</div><div class="l">Paths</div></div>
+    <div class="stat"><div class="n">{{ run.stats.get('probes', 0) }}</div><div class="l">Probes</div></div>
+    <div class="stat"><div class="n">{{ run.stats.get('flows', 0) }}</div><div class="l">Flows</div></div>
+    <div class="stat"><div class="n">{{ run.stats.get('findings', 0) }}</div><div class="l">Findings</div></div>
+    <div class="stat"><div class="n">{{ run.stats.get('critical', 0) }}</div><div class="l">Critical</div></div>
+  </div>
+  {% if run.stats.errors %}
+  <div class="hint">{{ run.stats.errors | length }} stage(s) failed — see Stages above.</div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="tabs">
+  <a href="/runs/{{ run.id }}" class="active">Overview</a>
+  <a href="/runs/{{ run.id }}/findings">Findings</a>
+  <a href="/runs/{{ run.id }}/paths">Paths</a>
+  <a href="/runs/{{ run.id }}/probes">Probes</a>
+  <a href="/runs/{{ run.id }}/js">Downloaded JS</a>
+  <a href="/runs/{{ run.id }}/artifact/report.html" target="_blank">HTML report</a>
+  <a href="/runs/{{ run.id }}/artifact/report.pdf" target="_blank">PDF</a>
+  <a href="/runs/{{ run.id }}/artifact/report.md" target="_blank">Markdown</a>
+</div>
+
+<div class="panel">
+  <div class="row">
+    <strong>Artifacts</strong>
+    <span class="muted mono">{{ directory }}</span>
+  </div>
+  <div class="hint">{% if files %}{{ files | join(', ') }}{% else %}No files yet — artifacts appear as stages complete.{% endif %}</div>
+</div>
+
+{% if live %}
+<script>
+  const runId = {{ run.id }};
+  async function poll() {
+    try {
+      const r = await fetch(`/api/runs/${runId}/progress`);
+      if (!r.ok) return;
+      const d = await r.json();
+      document.getElementById('status').textContent = d.status;
+      document.getElementById('status').className = 'pill ' + d.status;
+      const ul = document.getElementById('stages');
+      ul.innerHTML = (d.stages || []).map(s =>
+        `<li><span class="pill ${s.status}">${s.status}</span>` +
+        `<span class="stage-name">${s.stage}</span>` +
+        (s.detail && s.detail.error ? `<span class="stage-detail">${s.detail.error}</span>` : '') +
+        `</li>`).join('') || '<li class="muted">No stages recorded yet.</li>';
+      if (d.status !== 'running' && d.status !== 'queued') location.reload();
+    } catch (e) { /* transient network error; the next tick retries */ }
+  }
+  setInterval(poll, 2000);
+  poll();
+</script>
+{% endif %}
+{% endblock %}

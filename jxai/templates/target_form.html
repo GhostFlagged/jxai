@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit " + target.name if target else "Add target" }}{% endblock %}
+{% block content %}
+<h1>{{ "Edit target" if target else "Add target" }}</h1>
+<p class="sub">Only the URL is required. Scope defaults to that host, so a single-host
+bug-bounty program needs nothing else.</p>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<form method="post" action="{{ '/targets/' ~ target.id ~ '/edit' if target else '/targets' }}">
+  <div class="panel">
+    <label>Name
+      <input type="text" name="name" required value="{{ target.name if target else '' }}" placeholder="acme-corp">
+      <div class="hint">Unique label for this target.</div>
+    </label>
+    <label>URL
+      <input type="url" name="url" required value="{{ target.url if target else '' }}" placeholder="https://app.acme.com">
+    </label>
+    <label>Scope
+      <textarea name="scope" placeholder="acme.com&#10;*.acme.com">{{ target.scope | join('\n') if target else '' }}</textarea>
+      <div class="hint">One host or <code>*.domain</code> glob per line. Anything outside scope is never probed.
+        Leave blank to scope to the target's own host.</div>
+    </label>
+    <label>Notes
+      <input type="text" name="notes" value="{{ target.notes if target else '' }}" placeholder="program link, tester notes">
+    </label>
+    {% if target %}
+    <label>Stage overrides (JSON, optional)
+      <textarea name="overrides" placeholder='{"js_download": {"max_files": 120}}'>{{ target.overrides | tojson(indent=2) if target.overrides else '' }}</textarea>
+      <div class="hint">Merged over the shipped defaults for this target only.</div>
+    </label>
+    {% endif %}
+    <div class="actions">
+      <button class="btn primary" type="submit">{{ "Save" if target else "Add target" }}</button>
+      <a class="btn" href="/">Cancel</a>
+    </div>
+  </div>
+</form>
+
+{% if target %}
+<form method="post" action="/targets/{{ target.id }}/delete" onsubmit="return confirm('Delete {{ target.name }} and all its run history?')">
+  <button class="btn danger" type="submit">Delete target</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Findings — run #{{ run.id }}{% endblock %}
+{% block content %}
+<h1>Findings — run #{{ run.id }}</h1>
+<p class="sub">{{ target.name if target else "" }} · model-triaged findings and static taint flows.</p>
+
+<div class="tabs">
+  <a href="/runs/{{ run.id }}">Overview</a>
+  <a href="/runs/{{ run.id }}/findings" class="active">Findings</a>
+  <a href="/runs/{{ run.id }}/paths">Paths</a>
+  <a href="/runs/{{ run.id }}/probes">Probes</a>
+  <a href="/runs/{{ run.id }}/js">Downloaded JS</a>
+</div>
+
+{% if findings %}
+<table>
+  <thead><tr><th>Severity</th><th>Source</th><th>Finding</th><th>Detail</th><th>Location</th></tr></thead>
+  <tbody>
+  {% for f in findings %}
+    <tr>
+      <td><span class="pill {{ f.severity }}">{{ f.severity }}</span></td>
+      <td class="muted">{{ f.source }}</td>
+      <td>{{ f.title }}</td>
+      <td class="muted">{{ (f.detail or '') | truncate(220) }}</td>
+      <td class="mono hint">{{ (f.url or '') | truncate(40) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="panel empty">This run produced no findings, or has not finished yet.</div>
+{% endif %}
+{% endblock %}

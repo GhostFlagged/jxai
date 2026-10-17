@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}jxai — targets{% endblock %}
+{% block content %}
+<h1>Targets</h1>
+<p class="sub">JS audit targets. Add one, run a scan, review the report.</p>
+
+{% if targets %}
+<div class="grid">
+  {% for t in targets %}
+  <div class="card">
+    <h3>{{ t.name }} {% if not t.enabled %}<span class="pill">disabled</span>{% endif %}</h3>
+    <div class="url mono">{{ t.url }}</div>
+    {% if t.scope %}
+    <div class="hint">Scope: {{ t.scope | join(', ') }}</div>
+    {% endif %}
+    {% if t.notes %}<div class="hint">{{ t.notes }}</div>{% endif %}
+    <div class="actions">
+      <a class="btn primary" href="/targets/{{ t.id }}">Open</a>
+      {% if t.enabled and has_key() %}
+      <form class="inline" method="post" action="/targets/{{ t.id }}/run">
+        <button class="btn" type="submit">Run scan</button>
+      </form>
+      {% endif %}
+      <a class="btn" href="/targets/{{ t.id }}/edit">Edit</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel empty">
+  No targets yet. <a href="/targets/new">Add your first target</a>.
+</div>
+{% endif %}
+
+<h2>Recent runs</h2>
+{% if runs %}
+<table>
+  <thead><tr><th>#</th><th>Target</th><th>Status</th><th>Started</th><th>JS</th><th>Paths</th><th>Findings</th><th></th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td class="mono">{{ r.id }}</td>
+      <td>{{ r.target_name }}</td>
+      <td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
+      <td class="muted">{{ r.started_at | ts }}</td>
+      <td class="num">{{ r.stats.get('js_files', '—') }}</td>
+      <td class="num">{{ r.stats.get('paths', '—') }}</td>
+      <td class="num">{{ r.stats.get('findings', '—') }}</td>
+      <td><a href="/runs/{{ r.id }}">open</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="panel empty">No runs yet.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,35 @@
+# Secrets — never commit real keys
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data: SQLite registry and all scan artifacts
+data/
+
+# Scan output. These hold the target's source code and live probe responses,
+# which is exactly the material that must not be public.
+output/
+archive/
+
+# Virtualenvs (note the historical typo in the directory name is preserved
+# so existing local envs keep working)
+.vnev/
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Tooling / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

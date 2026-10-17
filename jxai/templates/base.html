@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}jxai{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">jxai</a>
+  <nav>
+    <a href="/">Targets</a>
+    <a href="/targets/new">Add target</a>
+    <a href="/api/docs">API</a>
+  </nav>
+  <div class="queue">
+    {{ queue.active }}/{{ queue.max_parallel }} active{% if queue.queued %} · {{ queue.queued }} queued{% endif %}
+  </div>
+</header>
+{% if not has_key() %}
+  <div class="banner warn">SINOX_API_KEY is not set. Target management works, but scans will fail until it is configured.</div>
+{% endif %}
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

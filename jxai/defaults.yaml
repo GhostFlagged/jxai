@@ -1,0 +1,32 @@
+sinox:
+  api_key_env: SINOX_API_KEY
+  sonnet_model: t-claude-sonnet-5
+  jev_model: t-jev-1.13
+js_download:
+  max_files: 50
+  max_size_kb: 2048
+  timeout: 15
+  user_agent: bounty-research/1.0
+deep_audit:
+  max_files: 8
+  max_chars_per_file: 40000
+ai_triage_results:
+  max_candidates: 25
+jev_classify:
+  max_probes: 200
+auth_test:
+  concurrency: 10
+  timeout: 8
+  headers:
+    User-Agent: bounty-research/1.0
+  skip_extensions:
+    - .js
+    - .css
+    - .png
+    - .jpg
+    - .svg
+    - .woff
+    - .ico
+report:
+  include_snippets: true
+  snippet_length: 1000

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Test
+        env:
+          # Not used by the suite, but config import reads it.
+          SINOX_API_KEY: test-key-not-a-secret
+        run: pytest -q
+
+      - name: Verify the app imports and routes are wired
+        env:
+          SINOX_API_KEY: test-key-not-a-secret
+        run: |
+          python -c "
+          from fastapi.testclient import TestClient
+          from jxai.web import app
+          with TestClient(app) as c:
+              for path in ('/', '/targets/new', '/healthz'):
+                  assert c.get(path).status_code == 200, path
+          print('web app ok')
+          "
+
+      - name: Verify no secrets are committed
+        run: |
+          # .env must never exist in the tree, and no live key prefix may appear.
+          test ! -f .env || (echo '.env is committed' && exit 1)
+          if git grep -nE 'sk-[a-z]+-[A-Za-z0-9]{24,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}' -- \
+             ':!*.example' ':!.env.example'; then
+            echo "possible secret committed"; exit 1
+          fi
+          echo "no secrets found"

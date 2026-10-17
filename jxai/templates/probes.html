@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Probes — run #{{ run.id }}{% endblock %}
+{% block content %}
+<h1>Live probes — run #{{ run.id }}</h1>
+<p class="sub">Unauthenticated access checks against in-scope endpoints. A row is
+interesting when no probe hit an auth wall.</p>
+
+<div class="tabs">
+  <a href="/runs/{{ run.id }}">Overview</a>
+  <a href="/runs/{{ run.id }}/findings">Findings</a>
+  <a href="/runs/{{ run.id }}/paths">Paths</a>
+  <a href="/runs/{{ run.id }}/probes" class="active">Probes</a>
+  <a href="/runs/{{ run.id }}/js">Downloaded JS</a>
+</div>
+
+{% if results %}
+{% set open = results | selectattr('probes') | map('attr', 'probes') | flatten
+        | selectattr('status', 'equalto', 200) | list %}
+<div class="panel">
+  <strong>{{ results | length }}</strong> endpoints probed ·
+  <strong>{{ open | length }}</strong> returned 200 unauthenticated.
+</div>
+<table>
+  <thead><tr><th>URL</th><th>Method</th><th>Probe</th><th>Status</th><th>Length</th><th>Auth wall</th><th>SPA shell</th></tr></thead>
+  <tbody>
+  {% for r in results %}
+    {% for p in r.probes %}
+    <tr>
+      <td class="mono">{{ r.url | truncate(80) }}</td>
+      <td>{{ p.method or r.method }}</td>
+      <td class="muted">{{ p.probe }}</td>
+      <td>
+        {% if p.error %}<span class="muted">err</span>{% else %}
+        <span class="pill {% if p.status == 200 and not p.auth_wall and not p.spa_shell %}success{% elif p.auth_wall %}low{% endif %}">{{ p.status }}</span>
+        {% endif %}
+      </td>
+      <td class="num">{{ p.length if not p.error else '—' }}</td>
+      <td>{{ 'yes' if p.auth_wall else 'no' }}</td>
+      <td>{{ 'yes' if p.spa_shell else 'no' }}</td>
+    </tr>
+    {% endfor %}
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="panel empty">No probes were executed for this run yet.</div>
+{% endif %}
+{% endblock %}
